@@ -5,7 +5,14 @@ import Message from "./Message";
 import MessageSend from "./MessageSend";
 
 const RightSide = (props) => {
-  const { currentfriend, inputHendle, newMessage, sendMessage } = props;
+  const {
+    currentfriend,
+    inputHendle,
+    newMessage,
+    sendMessage,
+    message,
+    scrollRef,
+  } = props;
 
   return (
     <div className="col-9">
@@ -38,8 +45,12 @@ const RightSide = (props) => {
                   </div>
                 </div>
               </div>
+              <Message
+                message={message}
+                currentfriend={currentfriend}
+                scrollRef={scrollRef}
+              />
 
-              <Message />
               <MessageSend
                 inputHendle={inputHendle}
                 newMessage={newMessage}
