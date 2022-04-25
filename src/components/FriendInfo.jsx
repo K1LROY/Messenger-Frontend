@@ -1,18 +1,18 @@
 import React from "react";
 import { FaCaretSquareDown, FaEdit, FaSistrix } from "react-icons/fa";
 
-const FriendInfo = () => {
+const FriendInfo = ({ currentfriend }) => {
   return (
     <div className="friend-info">
       <input type="checkbox" id="gallery" />
       <div className="image-name">
         <div className="image">
-          <img src="/image/20003ariyan.jpg" alt="" />
+          <img src={`./image/${currentfriend.image}`} alt="" />
         </div>
         <div className="active-user">Active</div>
 
         <div className="name">
-          <h4>Kazi Ariyan </h4>
+          <h4>{currentfriend.userName} </h4>
         </div>
       </div>
 
@@ -21,12 +21,10 @@ const FriendInfo = () => {
           <h3>Coustomise Chat </h3>
           <FaCaretSquareDown />
         </div>
-
         <div className="privacy">
           <h3>Privacy and Support </h3>
           <FaCaretSquareDown />
         </div>
-
         <div className="media">
           <h3>Shared Media </h3>
           <label htmlFor="gallery">
@@ -35,7 +33,6 @@ const FriendInfo = () => {
           </label>
         </div>
       </div>
-
       <div className="gallery">
         <img src="/image/20003ariyan.jpg" alt="" />
         <img src="/image/20003ariyan.jpg" alt="" />
@@ -45,5 +42,4 @@ const FriendInfo = () => {
     </div>
   );
 };
-
 export default FriendInfo;
