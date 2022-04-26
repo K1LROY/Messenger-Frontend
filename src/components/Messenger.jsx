@@ -14,9 +14,18 @@ import {
 } from "../store/actions/messengerAction";
 import { userLogout } from "../store/actions/authAction";
 
+import toast, { Toaster } from "react-hot-toast";
+
 import { io } from "socket.io-client";
 
+import useSound from "use-sound";
+import notificationSound from "../audio/notification.mp3";
+import sendingSound from "../audio/sending.mp3";
+
 const Messenger = () => {
+  const [notificationSPlay] = useSound(notificationSound);
+  const [sendingSPlay] = useSound(sendingSound);
+
   const socket = useRef();
   const scrollRef = useRef();
 
@@ -24,13 +33,20 @@ const Messenger = () => {
   const [newMessage, setNewMessage] = useState("");
   const [activeUser, setActiveUser] = useState([]);
   const [socketMessage, setSocketMessage] = useState("");
+  const [typingMessage, setTypingMessage] = useState("");
 
   const inputHendle = (e) => {
     setNewMessage(e.target.value);
+    socket.current.emit("typingMessage", {
+      senderId: myInfo.id,
+      reseverId: currentfriend._id,
+      msg: e.target.value,
+    });
   };
 
   const sendMessage = (e) => {
     e.preventDefault();
+    sendingSPlay();
     const data = {
       senderName: myInfo.userName,
       reseverId: currentfriend._id,
@@ -46,18 +62,26 @@ const Messenger = () => {
         image: "",
       },
     });
+    socket.current.emit("typingMessage", {
+      senderId: myInfo.id,
+      reseverId: currentfriend._id,
+      msg: "",
+    });
     dispatch(messageSend(data));
   };
   console.log(currentfriend);
   const { friends, message } = useSelector((state) => state.messenger);
   const { myInfo } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
+
   useEffect(() => {
     dispatch(getFriends());
   }, []);
+
   useEffect(() => {
     if (friends && friends.length > 0) setCurrentFriend(friends[0]);
   }, [friends]);
+
   useEffect(() => {
     dispatch(getMessage(currentfriend._id));
   }, [currentfriend?._id]);
@@ -68,12 +92,29 @@ const Messenger = () => {
 
   const emojiSend = (emu) => {
     setNewMessage(`${newMessage}` + emu);
+    socket.current.emit("typingMessage", {
+      senderId: myInfo.id,
+      reseverId: currentfriend._id,
+      msg: emu,
+    });
   };
 
   const ImageSend = (e) => {
     if (e.target.files.length !== 0) {
+      sendingSPlay();
       const imagename = e.target.files[0].name;
       const newImageName = Date.now() + imagename;
+
+      socket.current.emit("sendMessage", {
+        senderId: myInfo.id,
+        senderName: myInfo.userName,
+        reseverId: currentfriend._id,
+        time: new Date(),
+        message: {
+          text: "",
+          image: newImageName,
+        },
+      });
 
       const formData = new FormData();
 
@@ -108,6 +149,9 @@ const Messenger = () => {
     socket.current.on("getMessage", (data) => {
       setSocketMessage(data);
     });
+    socket.current.on("typingMessageGet", (data) => {
+      setTypingMessage(data);
+    });
   }, []);
 
   useEffect(() => {
@@ -121,6 +165,17 @@ const Messenger = () => {
     });
   }, []);
 
+  useEffect(() => {
+    if (
+      socketMessage &&
+      socketMessage.senderId !== currentfriend._id &&
+      socketMessage.reseverId === myInfo.id
+    ) {
+      notificationSPlay();
+      toast.success(`${socketMessage.senderName} Send a New Message`);
+    }
+  }, [socketMessage]);
+
   const [hide, setHide] = useState(true);
 
   const logout = () => {
@@ -130,6 +185,15 @@ const Messenger = () => {
 
   return (
     <div className="messenger">
+      <Toaster
+        position={"top-right"}
+        reverseOrder={false}
+        toastOptions={{
+          style: {
+            fontSize: "18px",
+          },
+        }}
+      />
       <div className="row">
         <div className="col-3">
           <div className="left-side">
@@ -213,6 +277,7 @@ const Messenger = () => {
             scrollRef={scrollRef}
             emojiSend={emojiSend}
             ImageSend={ImageSend}
+            typingMessage={typingMessage}
           />
         ) : (
           "Please Select your Friend"
