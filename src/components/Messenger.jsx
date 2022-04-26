@@ -13,11 +13,16 @@ import {
   ImageMessageSend,
 } from "../store/actions/messengerAction";
 
+import { io } from "socket.io-client";
+
 const Messenger = () => {
+  const socket = useRef();
   const scrollRef = useRef();
 
   const [currentfriend, setCurrentFriend] = useState("");
   const [newMessage, setNewMessage] = useState("");
+  const [activeUser, setActiveUser] = useState([]);
+  const [socketMessage, setSocketMessage] = useState("");
 
   const inputHendle = (e) => {
     setNewMessage(e.target.value);
@@ -30,6 +35,16 @@ const Messenger = () => {
       reseverId: currentfriend._id,
       message: newMessage ? newMessage : "❤",
     };
+    socket.current.emit("sendMessage", {
+      senderId: myInfo.id,
+      senderName: myInfo.userName,
+      reseverId: currentfriend._id,
+      time: new Date(),
+      message: {
+        text: newMessage ? newMessage : "❤",
+        image: "",
+      },
+    });
     dispatch(messageSend(data));
   };
   console.log(currentfriend);
@@ -66,8 +81,44 @@ const Messenger = () => {
       formData.append("reseverId", currentfriend._id);
       formData.append("image", e.target.files[0]);
       dispatch(ImageMessageSend(formData));
+      setNewMessage("");
     }
   };
+
+  useEffect(() => {
+    if (socketMessage && currentfriend) {
+      if (
+        socketMessage.senderId === currentfriend._id &&
+        socketMessage.reseverId === myInfo.id
+      ) {
+        dispatch({
+          type: "SOCKET_MESSAGE",
+          payload: {
+            message: socketMessage,
+          },
+        });
+      }
+    }
+    setSocketMessage("");
+  }, [socketMessage]);
+
+  useEffect(() => {
+    socket.current = io("ws://localhost:8000");
+    socket.current.on("getMessage", (data) => {
+      setSocketMessage(data);
+    });
+  }, []);
+
+  useEffect(() => {
+    socket.current.emit("addUser", myInfo.id, myInfo);
+  }, []);
+
+  useEffect(() => {
+    socket.current.on("getUser", (users) => {
+      const filterUser = users.filter((u) => u.userId !== myInfo.id);
+      setActiveUser(filterUser);
+    });
+  }, []);
 
   return (
     <div className="messenger">
@@ -106,7 +157,9 @@ const Messenger = () => {
               </div>
             </div>
             <div className="active-friends">
-              <ActiveFriend />
+              {activeUser && activeUser.length > 0
+                ? activeUser.map((u) => <ActiveFriend user={u} />)
+                : ""}
             </div>
             <div className="friends">
               {friends && friends.length > 0
