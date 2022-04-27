@@ -1,9 +1,8 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useState, useRef } from "react";
-import { FaEllipsisH, FaEdit, FaSistrix, FaSignOutAlt } from "react-icons/fa";
+import { FaEllipsisH, FaEdit, FaSistrix } from "react-icons/fa";
 import ActiveFriend from "./ActiveFriend";
 import Friends from "./Friends";
-
 import RightSide from "./RightSide";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -11,13 +10,12 @@ import {
   messageSend,
   getMessage,
   ImageMessageSend,
+  seenMessage,
+  updateMessage,
 } from "../store/actions/messengerAction";
-import { userLogout } from "../store/actions/authAction";
 
 import toast, { Toaster } from "react-hot-toast";
-
 import { io } from "socket.io-client";
-
 import useSound from "use-sound";
 import notificationSound from "../audio/notification.mp3";
 import sendingSound from "../audio/sending.mp3";
@@ -25,107 +23,55 @@ import sendingSound from "../audio/sending.mp3";
 const Messenger = () => {
   const [notificationSPlay] = useSound(notificationSound);
   const [sendingSPlay] = useSound(sendingSound);
-
-  const socket = useRef();
   const scrollRef = useRef();
+  const socket = useRef();
+
+  const { friends, message, messageSendSuccess, message_get_success } =
+    useSelector((state) => state.messenger);
+
+  const { myInfo } = useSelector((state) => state.auth);
 
   const [currentfriend, setCurrentFriend] = useState("");
+
   const [newMessage, setNewMessage] = useState("");
   const [activeUser, setActiveUser] = useState([]);
   const [socketMessage, setSocketMessage] = useState("");
   const [typingMessage, setTypingMessage] = useState("");
 
-  const inputHendle = (e) => {
-    setNewMessage(e.target.value);
-    socket.current.emit("typingMessage", {
-      senderId: myInfo.id,
-      reseverId: currentfriend._id,
-      msg: e.target.value,
-    });
-  };
-
-  const sendMessage = (e) => {
-    e.preventDefault();
-    sendingSPlay();
-    const data = {
-      senderName: myInfo.userName,
-      reseverId: currentfriend._id,
-      message: newMessage ? newMessage : "❤",
-    };
-    socket.current.emit("sendMessage", {
-      senderId: myInfo.id,
-      senderName: myInfo.userName,
-      reseverId: currentfriend._id,
-      time: new Date(),
-      message: {
-        text: newMessage ? newMessage : "❤",
-        image: "",
-      },
-    });
-    socket.current.emit("typingMessage", {
-      senderId: myInfo.id,
-      reseverId: currentfriend._id,
-      msg: "",
-    });
-    dispatch(messageSend(data));
-  };
-  console.log(currentfriend);
-  const { friends, message } = useSelector((state) => state.messenger);
-  const { myInfo } = useSelector((state) => state.auth);
-  const dispatch = useDispatch();
-
   useEffect(() => {
-    dispatch(getFriends());
-  }, []);
-
-  useEffect(() => {
-    if (friends && friends.length > 0) setCurrentFriend(friends[0]);
-  }, [friends]);
-
-  useEffect(() => {
-    dispatch(getMessage(currentfriend._id));
-  }, [currentfriend?._id]);
-
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [message]);
-
-  const emojiSend = (emu) => {
-    setNewMessage(`${newMessage}` + emu);
-    socket.current.emit("typingMessage", {
-      senderId: myInfo.id,
-      reseverId: currentfriend._id,
-      msg: emu,
+    socket.current = io("ws://localhost:8000");
+    socket.current.on("getMessage", (data) => {
+      setSocketMessage(data);
     });
-  };
+    socket.current.on("typingMessageGet", (data) => {
+      setTypingMessage(data);
+    });
 
-  const ImageSend = (e) => {
-    if (e.target.files.length !== 0) {
-      sendingSPlay();
-      const imagename = e.target.files[0].name;
-      const newImageName = Date.now() + imagename;
-
-      socket.current.emit("sendMessage", {
-        senderId: myInfo.id,
-        senderName: myInfo.userName,
-        reseverId: currentfriend._id,
-        time: new Date(),
-        message: {
-          text: "",
-          image: newImageName,
+    socket.current.on("msgSeenResponse", (msg) => {
+      dispatch({
+        type: "SEEN_MESSAGE",
+        payload: {
+          msgInfo: msg,
         },
       });
+    });
 
-      const formData = new FormData();
+    socket.current.on("msgDelivaredResponse", (msg) => {
+      dispatch({
+        type: "DELIVARED_MESSAGE",
+        payload: {
+          msgInfo: msg,
+        },
+      });
+    });
 
-      formData.append("senderName", myInfo.userName);
-      formData.append("imageName", newImageName);
-      formData.append("reseverId", currentfriend._id);
-      formData.append("image", e.target.files[0]);
-      dispatch(ImageMessageSend(formData));
-      setNewMessage("");
-    }
-  };
+    socket.current.on("seenSuccess", (data) => {
+      dispatch({
+        type: "SEEN_ALL",
+        payload: data,
+      });
+    });
+  }, []);
 
   useEffect(() => {
     if (socketMessage && currentfriend) {
@@ -139,20 +85,19 @@ const Messenger = () => {
             message: socketMessage,
           },
         });
+        dispatch(seenMessage(socketMessage));
+        socket.current.emit("messageSeen", socketMessage);
+        dispatch({
+          type: "UPDATE_FRIEND_MESSAGE",
+          payload: {
+            msgInfo: socketMessage,
+            status: "seen",
+          },
+        });
       }
     }
     setSocketMessage("");
   }, [socketMessage]);
-
-  useEffect(() => {
-    socket.current = io("ws://localhost:8000");
-    socket.current.on("getMessage", (data) => {
-      setSocketMessage(data);
-    });
-    socket.current.on("typingMessageGet", (data) => {
-      setTypingMessage(data);
-    });
-  }, []);
 
   useEffect(() => {
     socket.current.emit("addUser", myInfo.id, myInfo);
@@ -173,16 +118,138 @@ const Messenger = () => {
     ) {
       notificationSPlay();
       toast.success(`${socketMessage.senderName} Send a New Message`);
+      dispatch(updateMessage(socketMessage));
+      socket.current.emit("delivaredMessage", socketMessage);
+      dispatch({
+        type: "UPDATE_FRIEND_MESSAGE",
+        payload: {
+          msgInfo: socketMessage,
+          status: "delivared",
+        },
+      });
     }
   }, [socketMessage]);
 
-  const [hide, setHide] = useState(true);
-
-  const logout = () => {
-    dispatch(userLogout());
-    socket.current.emit("logout", myInfo.id);
+  const inputHendle = (e) => {
+    setNewMessage(e.target.value);
+    socket.current.emit("typingMessage", {
+      senderId: myInfo.id,
+      reseverId: currentfriend._id,
+      msg: e.target.value,
+    });
   };
 
+  const sendMessage = (e) => {
+    e.preventDefault();
+    sendingSPlay();
+    const data = {
+      senderName: myInfo.userName,
+      reseverId: currentfriend._id,
+      message: newMessage ? newMessage : "❤",
+    };
+
+    socket.current.emit("typingMessage", {
+      senderId: myInfo.id,
+      reseverId: currentfriend._id,
+
+      msg: "",
+    });
+    dispatch(messageSend(data));
+    setNewMessage("");
+  };
+
+  useEffect(() => {
+    if (messageSendSuccess) {
+      socket.current.emit("sendMessage", message[message.length - 1]);
+      dispatch({
+        type: "UPDATE_FRIEND_MESSAGE",
+        payload: {
+          msgInfo: message[message.length - 1],
+        },
+      });
+      dispatch({
+        type: "MESSAGE_SEND_SUCCESS_CLEAR",
+      });
+    }
+  }, [messageSendSuccess]);
+
+  console.log(currentfriend);
+
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    dispatch(getFriends());
+  }, []);
+
+  useEffect(() => {
+    if (friends && friends.length > 0) setCurrentFriend(friends[0].fndInfo);
+  }, [friends]);
+
+  useEffect(() => {
+    dispatch(getMessage(currentfriend._id));
+    if (friends.length > 0) {
+    }
+  }, [currentfriend?._id]);
+
+  useEffect(() => {
+    if (message.length > 0) {
+      if (
+        message[message.length - 1].senderId !== myInfo.id &&
+        message[message.length - 1].status !== "seen"
+      ) {
+        dispatch({
+          type: "UPDATE",
+          payload: {
+            id: currentfriend._id,
+          },
+        });
+        socket.current.emit("seen", {
+          senderId: currentfriend._id,
+          reseverId: myInfo.id,
+        });
+        dispatch(seenMessage({ _id: message[message.length - 1]._id }));
+      }
+    }
+    dispatch({
+      type: "MESSAGE_GET_SUCCESS_CLEAR",
+    });
+  }, [message_get_success]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [message]);
+
+  const emojiSend = (emu) => {
+    setNewMessage(`${newMessage}` + emu);
+    socket.current.emit("typingMessage", {
+      senderId: myInfo.id,
+      reseverId: currentfriend._id,
+      msg: emu,
+    });
+  };
+  const ImageSend = (e) => {
+    if (e.target.files.length !== 0) {
+      sendingSPlay();
+      const imagename = e.target.files[0].name;
+      const newImageName = Date.now() + imagename;
+      socket.current.emit("sendMessage", {
+        senderId: myInfo.id,
+        senderName: myInfo.userName,
+        reseverId: currentfriend._id,
+        time: new Date(),
+        message: {
+          text: "",
+          image: newImageName,
+        },
+      });
+      const formData = new FormData();
+      formData.append("senderName", myInfo.userName);
+      formData.append("imageName", newImageName);
+      formData.append("reseverId", currentfriend._id);
+      formData.append("image", e.target.files[0]);
+      dispatch(ImageMessageSend(formData));
+    }
+  };
   return (
     <div className="messenger">
       <Toaster
@@ -207,27 +274,11 @@ const Messenger = () => {
                 </div>
               </div>
               <div className="icons">
-                <div onClick={() => setHide(!hide)} className="icon">
+                <div className="icon">
                   <FaEllipsisH />
                 </div>
                 <div className="icon">
                   <FaEdit />
-                </div>
-                <div className={hide ? "theme_logout" : "theme_logout show"}>
-                  <h3>Dark Mode </h3>
-                  <div className="on">
-                    <label htmlFor="dark">ON</label>
-                    <input type="radio" value="dark" name="theme" id="dark" />
-                  </div>
-
-                  <div className="of">
-                    <label htmlFor="white">OFF</label>
-                    <input type="radio" value="white" name="theme" id="white" />
-                  </div>
-
-                  <div onClick={logout} className="logout">
-                    <FaSignOutAlt /> Logout
-                  </div>
                 </div>
               </div>
             </div>
@@ -246,7 +297,12 @@ const Messenger = () => {
             </div>
             <div className="active-friends">
               {activeUser && activeUser.length > 0
-                ? activeUser.map((u) => <ActiveFriend user={u} />)
+                ? activeUser.map((u) => (
+                    <ActiveFriend
+                      setCurrentFriend={setCurrentFriend}
+                      user={u}
+                    />
+                  ))
                 : ""}
             </div>
             <div className="friends">
@@ -277,6 +333,7 @@ const Messenger = () => {
             scrollRef={scrollRef}
             emojiSend={emojiSend}
             ImageSend={ImageSend}
+            activeUser={activeUser}
             typingMessage={typingMessage}
           />
         ) : (
