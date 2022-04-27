@@ -1,7 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useState, useRef } from "react";
 import { FaEllipsisH, FaEdit, FaSistrix } from "react-icons/fa";
-import ActiveFriend from "./ActiveFriend";
 import Friends from "./Friends";
 import RightSide from "./RightSide";
 import { useDispatch, useSelector } from "react-redux";
@@ -285,8 +284,7 @@ const Messenger = () => {
             <div className="friend-search">
               <div className="search">
                 <button>
-                  {" "}
-                  <FaSistrix />{" "}
+                  <FaSistrix />
                 </button>
                 <input
                   type="text"
@@ -295,7 +293,7 @@ const Messenger = () => {
                 />
               </div>
             </div>
-            <div className="active-friends">
+            {/* <div className="active-friends">
               {activeUser && activeUser.length > 0
                 ? activeUser.map((u) => (
                     <ActiveFriend
@@ -304,7 +302,7 @@ const Messenger = () => {
                     />
                   ))
                 : ""}
-            </div>
+            </div> */}
             <div className="friends">
               {friends && friends.length > 0
                 ? friends.map((fd) => (
@@ -316,7 +314,11 @@ const Messenger = () => {
                           : "hover-friend"
                       }
                     >
-                      <Friends myId={myInfo.id} friend={fd} />
+                      <Friends
+                        activeUser={activeUser}
+                        myId={myInfo.id}
+                        friend={fd}
+                      />
                     </div>
                   ))
                 : "No Friend"}
