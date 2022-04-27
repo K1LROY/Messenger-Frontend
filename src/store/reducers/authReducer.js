@@ -76,7 +76,7 @@ export const authReducer = (state = authState, action) => {
     };
   }
 
-  if (type === "LOGOUT_SUCCESS") {
+  if (type === LOGOUT_SUCCESS) {
     return {
       ...state,
       authenticate: false,
