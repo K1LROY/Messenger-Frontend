@@ -1,3 +1,4 @@
+/* eslint-disable no-sequences */
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useEffect, useState, useRef } from "react";
 import { FaEllipsisH, FaEdit, FaSistrix, FaSignOutAlt } from "react-icons/fa";
@@ -11,6 +12,8 @@ import {
   ImageMessageSend,
   seenMessage,
   updateMessage,
+  getTheme,
+  themeSet,
 } from "../store/actions/messengerAction";
 import { userLogout } from "../store/actions/authAction";
 
@@ -26,8 +29,14 @@ const Messenger = () => {
   const scrollRef = useRef();
   const socket = useRef();
 
-  const { friends, message, messageSendSuccess, message_get_success } =
-    useSelector((state) => state.messenger);
+  const {
+    friends,
+    message,
+    messageSendSuccess,
+    message_get_success,
+    themeMood,
+    new_user_add,
+  } = useSelector((state) => state.messenger);
 
   const { myInfo } = useSelector((state) => state.auth);
 
@@ -108,6 +117,14 @@ const Messenger = () => {
       const filterUser = users.filter((u) => u.userId !== myInfo.id);
       setActiveUser(filterUser);
     });
+    socket.current.on("new_user_add", (data) => {
+      dispatch({
+        type: "NEW_USER_ADD",
+        payload: {
+          new_user_add: data,
+        },
+      });
+    });
   }, []);
 
   useEffect(() => {
@@ -173,13 +190,11 @@ const Messenger = () => {
     }
   }, [messageSendSuccess]);
 
-  console.log(currentfriend);
-
   const dispatch = useDispatch();
-
   useEffect(() => {
     dispatch(getFriends());
-  }, []);
+    dispatch({ type: "NEW_USER_ADD_CLEAR" });
+  }, [new_user_add]);
 
   useEffect(() => {
     if (friends && friends.length > 0) setCurrentFriend(friends[0].fndInfo);
@@ -257,8 +272,26 @@ const Messenger = () => {
     dispatch(userLogout());
     socket.current.emit("logout", myInfo.id);
   };
+
+  useEffect(() => {
+    dispatch(getTheme());
+  }, []);
+
+  const search = (e) => {
+    const getFriendClass = document.getElementsByClassName("hover-friend");
+    const frienNameClass = document.getElementsByClassName("Fd_name");
+    for (var i = 0; i < getFriendClass.length, i < frienNameClass.length; i++) {
+      let text = frienNameClass[i].innerText.toLowerCase();
+      if (text.indexOf(e.target.value.toLowerCase()) > -1) {
+        getFriendClass[i].style.display = "";
+      } else {
+        getFriendClass[i].style.display = "none";
+      }
+    }
+  };
+
   return (
-    <div className="messenger">
+    <div className={themeMood === "dark" ? "messenger theme" : "messenger"}>
       <Toaster
         position={"top-right"}
         reverseOrder={false}
@@ -291,12 +324,24 @@ const Messenger = () => {
                   <h3>Dark Mode </h3>
                   <div className="on">
                     <label htmlFor="dark">ON</label>
-                    <input type="radio" value="dark" name="theme" id="dark" />
+                    <input
+                      onChange={(e) => dispatch(themeSet(e.target.value))}
+                      type="radio"
+                      value="dark"
+                      name="theme"
+                      id="dark"
+                    />
                   </div>
 
                   <div className="of">
                     <label htmlFor="white">OFF</label>
-                    <input type="radio" value="white" name="theme" id="white" />
+                    <input
+                      onChange={(e) => dispatch(themeSet(e.target.value))}
+                      type="radio"
+                      value="white"
+                      name="theme"
+                      id="white"
+                    />
                   </div>
 
                   <div onClick={logout} className="logout">
@@ -311,6 +356,7 @@ const Messenger = () => {
                   <FaSistrix />
                 </button>
                 <input
+                  onChange={search}
                   type="text"
                   placeholder="Search"
                   className="form-control"

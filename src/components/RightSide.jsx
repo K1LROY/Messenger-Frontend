@@ -50,8 +50,7 @@ const RightSide = (props) => {
                   </div>
                   <div className="icon">
                     <label htmlFor="dot">
-                      {" "}
-                      <FaRocketchat />{" "}
+                      <FaRocketchat />
                     </label>
                   </div>
                 </div>
@@ -73,7 +72,11 @@ const RightSide = (props) => {
             </div>
           </div>
           <div className="col-4">
-            <FriendInfo currentfriend={currentfriend} activeUser={activeUser} />
+            <FriendInfo
+              message={message}
+              currentfriend={currentfriend}
+              activeUser={activeUser}
+            />
           </div>
         </div>
       </div>
